@@ -1,0 +1,77 @@
+---
+title: "Tarea 1 CV2"
+author: "Alejandro Brenes y Erick Venegas"
+date: "`r Sys.Date()`"
+output: html_document
+---
+Como primer paso, se bajan las bases de datos necesarias, tanto la de los datos de los asegurados como la tabla de mortalidad.
+```{r bajar_datos}
+library(readxl)
+datos_asegurados <- read_excel("Datos_Final.xlsx")
+tabla_mort <- read_excel("Tabla de mortalidad.xlsx")
+```
+
+Ahora se procede con el analisis exploratorio de los datos. Para esto se analizara cada base de datos por separada. Primero, la base de datos de mortalidad. Verificamos si hay datos faltantes de algun tipo:
+```{r datos_mort}
+
+tabla_mort <- tabla_mort[, -c(3, 5)] #Se eliminan estas columnas correspondientes a los fumadores
+
+any(is.na(tabla_mort))  
+```
+Vemos que los datos estan completos. Ahora podemos realizar un grafico para visualizar de mejor manera los datos: 
+
+```{r EDA_tabla_mort, warning=FALSE}
+library(ggplot2)
+
+# Suponiendo que tu dataframe se llama df
+ggplot(tabla_mort, aes(x = Edad)) + 
+  geom_line(aes(y = M_NF, color = "Mujeres")) +  # Primera línea
+  geom_line(aes(y = H_NF, color = "Hombres")) +  # Segunda línea
+  labs(title = "Mortalidad para diferentes edades",
+       x = "Edades",
+       y = "Mortalidad",
+       color = "Sexo") + 
+  theme_minimal()
+
+```
+
+Algo que se puede recalcar es que la mortalidad se comporta bastante similar hasta llegar a los 70 annos aproximadamente, ya que de ahi a aproximadamente los 110 annos la mortalidad en los hombres siempre es superior. Algo a recalcar es que se asume que en la edad maxima de esta base de datos, 120, la probabilidad de morir al anno siguiente no es 1, por lo que no hay una edad $\Omega$ limite donde se "corta". 
+
+Ademas, pareciera que las probabilidades estan bajo un enfoque mas optimista, estas al ser bastante bajas. Por ejemplo, hasta la edad de 117, tanto en hombres como en mujeres, la probabilidad de que la persona sobreviva al anno siguiente es inclusive mayor a la de morir. Esto es importante tomarlo en cuenta ya que puede repercutir en los montos de las reservas y como se comportan las personas a lo largo del tiempo. 
+
+
+Ahora pasamos al analisis de la base de datos de los asegurados, 
+```{r datos_asegurados}
+any(is.na(datos_asegurados)) 
+```
+Vemos que la base esta completa. Ahora, se puede analizar las columnas de datos cuantitativos: 
+
+```{r asegurados_cuantitativos}
+cat("Posibles sexos del asegurado:\n", unique(datos_asegurados$`Sexo del asegurado`), "\n")
+
+cat("Monedas utilizadas:\n", unique(datos_asegurados$Moneda), "\n")
+
+cat("Opciones para la periodicidad del pago:\n", unique(datos_asegurados$`Periodicidad del pago`), "\n")
+```
+
+Ahora, se puede realizar un analisis a los datos cuantitativos. Para empezar, verificar que cada id es unico: 
+
+```{r ID_asegurados}
+length(unique(datos_asegurados$Id)) == nrow(datos_asegurados)
+```
+Ahora, las fechas. 
+
+```{r fechas_asegurados}
+#pasamos los fechas a formato Date
+
+datos_asegurados$`Ultima renovación` <- as.Date(datos_asegurados$`Ultima renovación`)
+
+datos_asegurados$`Fecha de nacimiento del asegurado` <- as.Date(datos_asegurados$`Fecha de nacimiento del asegurado`)
+
+datos_asegurados$`Fecha de inicio de la póliza` <- as.Date(datos_asegurados$`Fecha de inicio de la póliza`)
+
+datos_asegurados$`Fecha de vencimiento de la póliza` <- as.Date(datos_asegurados$`Fecha de vencimiento de la póliza`)
+
+
+```
+
