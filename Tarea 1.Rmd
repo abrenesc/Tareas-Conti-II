@@ -153,3 +153,17 @@ ggplot(datos_asegurados, aes(x = `Periodicidad del pago`, y = `Monto de la prima
 Vemos que en la periodicidad anual y mensual es donde se dan más valores atípicos fuera de la caja (correspondiente al rango intercuartílico).
 
 # Cálculo de las provisiones matemáticas
+
+## Creación de Variables
+
+Como primer paso para calcular las provisiones matemáticas, se necesitan tomar en cuenta todas las variables necesarias. Primero, los datos a los que se pueden acceder directamente de la base de datos son: la suma asegurada, la prima comercial y la prima de inventario. Además, se conoce el interés técnico del 5% y los gastos de administración del 16 %. Por lo tanto, para calcular la provisión matemática en el momento $t$, $tV$, se necesitan calcular los seguros y anualidades asociadas a esta provisión. 
+
+Como primer paso, se podría obtener una columna nueva correspondiente a la edad de la persona en el momento en que inició la póliza. No se contabilizan meses ni días, únicamente los años cumplidos. Es decir, si alguien nació en agosto del año 2000, y el inicio de la póliza es en marzo de 2030, se toma como alguien de 29 años cerrado.
+
+```{r, warning=FALSE}
+library(lubridate)
+
+datos_asegurados$`Edad iniciando la póliza` <- as.integer(interval(datos_asegurados$`Fecha de nacimiento del asegurado`, datos_asegurados$`Fecha de inicio de la póliza`) / years(1))
+
+```
+
