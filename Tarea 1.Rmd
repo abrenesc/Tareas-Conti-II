@@ -42,12 +42,20 @@ Se puede recalcar es que la mortalidad se comporta bastante similar hasta llegar
 Además, pareciera que las probabilidades están bajo un enfoque más optimista, al ser estas bastante bajas. Por ejemplo, hasta la edad de 117, tanto en hombres como en mujeres, la probabilidad de que la persona sobreviva al año siguiente es inclusive mayor a la de morir. Esto es importante tomarlo en cuenta ya que puede repercutir en los montos de las reservas y cómo se comportan las personas a lo largo del tiempo. 
 
 ## Análisis para los datos de los contratos
-### Variables cualitativas
-Ahora pasamos al análisis de la base de datos de los asegurados, 
+
+Ahora pasamos al análisis de la base de datos de los asegurados. Como primer paso, se verifica que cada id sea único: 
+
+```{r ID_asegurados}
+length(unique(datos_asegurados$Id)) == nrow(datos_asegurados)
+```
+
+Vemos que la base esta completa:
 ```{r datos_asegurados}
 any(is.na(datos_asegurados)) 
 ```
-Vemos que la base esta completa. Ahora, se pueden analizar las columnas de datos cuantitativos: 
+
+### Variables cualitativas
+Ahora, se pueden analizar las columnas de datos cuantitativos: 
 
 ```{r asegurados_cuantitativos}
 cat("Posibles sexos del asegurado:\n", unique(datos_asegurados$`Sexo del asegurado`), "\n")
@@ -58,15 +66,11 @@ cat("Opciones para la periodicidad del pago:\n", unique(datos_asegurados$`Period
 ```
 
 ### Variables cuantitativas: fechas
-Se continúa con un análisis a los datos cuantitativos. Para empezar, verificar que cada id es único: 
+Se continúa con una serie de observaciones de los datos cuantitativos. Para empezar, las fechas. 
 
-```{r ID_asegurados}
-length(unique(datos_asegurados$Id)) == nrow(datos_asegurados)
-```
-Ahora, las fechas. 
+Se convierten las fechas a formato Date: 
 
 ```{r fechas_asegurados}
-#Se pasan las fechas a formato Date
 
 datos_asegurados$`Ultima renovación` <- as.Date(datos_asegurados$`Ultima renovación`)
 
@@ -81,7 +85,7 @@ datos_asegurados$`Fecha de vencimiento de la póliza` <- as.Date(datos_asegurado
 
 Ahora bien, las 4 fechas que se establecen para cada individuo deben de seguir un orden lógico. La fecha más antigua es la de nacimiento; de ahí en adelante, la fecha de inicio debe de ser mayor o igual de antigua que la última renovación, así como esta debe ser a lo sumo igual de antigua que la fecha de vencimiento. A continuación se verifican estas condiciones, mediante un cálculo vectorizado de condiciones. La idea es que en cada "which" se verifique fila por fila si las condiciones antes mencionadas sean falsas, en caso de serla, almacena la fila en la que se incumplió, obteniendo un vector con las filas que se incumplen las condiciones, en las que, por lo tanto, existe una inconsistencia.  
 
-```{r}
+```{r condiciones_fechas}
 
 # Cálculo vectorizado de las condiciones
 falsos_1 <- which(datos_asegurados$`Fecha de nacimiento del asegurado` >= datos_asegurados$`Ultima renovación`)
@@ -102,15 +106,45 @@ falsos_6
 ```
 Se puede ver que todas las condiciones lógicas que se plantearon se cumplen, a excepción del caso en el que se verifica que las fechas de inicio de la póliza deben de ser a lo sumo igual de antiguas que la última renovación. 
 
-```{r}
+```{r verificacion_condicion5}
 which(datos_asegurados$`Fecha de inicio de la póliza` > datos_asegurados$`Ultima renovación`)
 ```
-Cuando suprimimos el escenario en el que sean iguales, este comportamiento desaparece; de lo cual se deduce que en todos los asegurados, la fecha de inicio de la póliza fue cuando se dio la última renovación.
+Cuando suprimimos el escenario en el que sean iguales, este comportamiento desaparece; de lo cual se deduce que en todos estos asegurados, no se ha dado ninguna renovación desde la fecha de inicio de la póliza.
+
+Para todos los usuarios, la última renovación fue en 2023:
+```{r}
+any(format(datos_asegurados$`Ultima renovación`, "%Y") != "2023")
+```
+
+Solo en el usuario 191 la fecha de vencimiento no es ciertos años exactos después de la fecha de inicio de la póliza, pero se tomará como que sí por simplicidad:
+
+```{r}
+
+datos_asegurados$misma_fecha <- format(datos_asegurados$`Fecha de inicio de la póliza`, "%m-%d") == format(datos_asegurados$`Fecha de vencimiento de la póliza`, "%m-%d")
+
+which(datos_asegurados$misma_fecha == FALSE)
+```
+
+Sabemos que siempre la diferencia entre el 31 de diciembre 23 y la última evaluación es menor a un año:
+```{r}
+fecha_referencia <- as.Date("2023-12-31")
+
+diferencia <- as.numeric(difftime(fecha_referencia, datos_asegurados$`Ultima renovación`, units = "days"))
+
+# Se verifica si hay alguna diferencia menor a 365 días
+which(diferencia > 365 & diferencias >= 0)
+```
+
+Todos los años de la fecha de inicio de la póliza son 2022 o 2023:
+```{r}
+any(!(format(datos_asegurados$`Fecha de inicio de la póliza`, "%Y") %in% c("2022", "2023")))
+```
+
 
 ### Variables cuantitativas: montos
 
 Como primer paso se podría hacer un resumen con los estadísticos más destacados de las columnas correspondientes a montos.
-```{r}
+```{r resumen_montos}
 summary(datos_asegurados$`Suma asegurada`)
 summary(datos_asegurados$`Monto de la prima pura`)
 summary(datos_asegurados$`Monto de la prima de inventario`)
@@ -120,20 +154,20 @@ summary(datos_asegurados$`Monto de la prima comercial`)
 
 Ahora, una serie de gráficos y medidas estadísticas que ayuden a entender la dinámica de las variables. Primero, un gráfico que ayude a visualizar la relación entre la suma asegurada y la prima comercial.
 
-```{r}
+```{r grafico_SA_PrimaComercial}
 library(ggplot2)
 
 ggplot(datos_asegurados, aes(x = `Suma asegurada`, y = `Monto de la prima comercial`)) +
   geom_point(alpha = 0.6) +
   geom_smooth(method = "lm", se = FALSE, color = "blue") +
-  labs(title = "Suma Asegurada vs Prima Pura",
+  labs(title = "Suma Asegurada vs Prima Comercial",
        x = "Suma Asegurada",
-       y = "Prima Pura")
+       y = "Prima Comercial")
 
 ```
 
 Ahora, con el paquete GGally, se nos permite observar la densidad de cada variable (en la diagonal), la correlación que existe entre ellas (a la derecha de la diagonal), y gráficos de dispersión (a la izquierda de la diagonal). 
-```{r, warning=FALSE}
+```{r correlaciones, warning=FALSE}
 library(GGally)
 montos <- datos_asegurados[, c(6,10,11,12)]
 GGally::ggpairs(montos)
@@ -141,7 +175,7 @@ GGally::ggpairs(montos)
 Algo a destacar es que, como es de esperar, a mayor detallada y especificada es la prima, es decir, a mayor se acerca la prima a su valor final, más se correlaciona con la suma asegurada.  
 
 Finalmente, se puede hacer un boxplot para dimensionar la relación que tienen una variable cuantitativa con una cualitativa. Por ejemplo, la prima comercial con la periodicidad de pago. 
-```{r}
+```{r boxplot}
 ggplot(datos_asegurados, aes(x = `Periodicidad del pago`, y = `Monto de la prima comercial`)) +
   geom_boxplot() +
   labs(title = "Distribución de la Prima Comercial según la Periodicidad del Pago",
@@ -158,12 +192,114 @@ Vemos que en la periodicidad anual y mensual es donde se dan más valores atípi
 
 Como primer paso para calcular las provisiones matemáticas, se necesitan tomar en cuenta todas las variables necesarias. Primero, los datos a los que se pueden acceder directamente de la base de datos son: la suma asegurada, la prima comercial y la prima de inventario. Además, se conoce el interés técnico del 5% y los gastos de administración del 16 %. Por lo tanto, para calcular la provisión matemática en el momento $t$, $tV$, se necesitan calcular los seguros y anualidades asociadas a esta provisión. 
 
-Como primer paso, se podría obtener una columna nueva correspondiente a la edad de la persona en el momento en que inició la póliza. No se contabilizan meses ni días, únicamente los años cumplidos. Es decir, si alguien nació en agosto del año 2000, y el inicio de la póliza es en marzo de 2030, se toma como alguien de 29 años cerrado.
+Como primer paso, se podría obtener una columna nueva correspondiente a la edad de la persona en el momento en que inició la póliza. No se contabilizan meses ni días, únicamente los años cumplidos. Es decir, si alguien nació en agosto del año 2000, y el inicio de la póliza es en marzo de 2030, se toma como alguien de 29 años.
 
-```{r, warning=FALSE}
+```{r edades, warning=FALSE}
 library(lubridate)
 
 datos_asegurados$`Edad iniciando la póliza` <- as.integer(interval(datos_asegurados$`Fecha de nacimiento del asegurado`, datos_asegurados$`Fecha de inicio de la póliza`) / years(1))
 
 ```
+
+Datos
+
+```{r datos}
+tasa = 0.05
+gastos_ad = 0.16
+```
+
+```{r funcion_seguro_temporal}
+seguro_temporal <- function(tabla_mort, datos_asegurados, usuario,t){ 
+  
+  temporalidad <- ((as.numeric(format(datos_asegurados$`Fecha de vencimiento de la póliza`[usuario], "%Y"))) - as.numeric(format(datos_asegurados$`Fecha de inicio de la póliza`[usuario], "%Y"))) - t
+  
+  if (temporalidad < 0){
+    return("Se excedio la temporalidad del contrato")
+  }
+  
+  edad <- as.numeric(datos_asegurados$`Edad iniciando la póliza`[usuario]) + t
+  sexo <- datos_asegurados$`Sexo del asegurado`[usuario]
+  
+  valor_seguro <-0
+  prob_sobrevivencia <- 1
+  
+  if (sexo == F){
+    for (i in 0:(temporalidad-1)){ 
+      edad_actual <- edad + i
+      q_actualizado <- tabla_mort$M_NF[edad_actual + 1]
+      valor_seguro <- valor_seguro + (1/(1+tasa))^(i+1)*prob_sobrevivencia*q_actualizado
+      prob_sobrevivencia <- prob_sobrevivencia*(1 - q_actualizado)
+    }
+  }
+  else {
+    for (i in 0:(temporalidad-1)){ 
+      edad_actual <- edad + i
+      q_actualizado <- tabla_mort$H_NF[edad_actual + 1]
+      valor_seguro <- valor_seguro + (1/(1+tasa))^(i+1)*prob_sobrevivencia*q_actualizado
+      prob_sobrevivencia <- prob_sobrevivencia*(1 - q_actualizado)
+    }
+  }
+
+  return(valor_seguro)
+}
+```
+
+
+```{r funcion_anualidad_temporal}
+anualidad_temporal <- function(tabla_mort, datos_asegurados, usuario, t){
+
+  temporalidad <- ((as.numeric(format(datos_asegurados$`Fecha de vencimiento de la póliza`[usuario], "%Y"))) - as.numeric(format(datos_asegurados$`Fecha de inicio de la póliza`[usuario], "%Y"))) - t
+  
+  if (temporalidad < 0){
+    return("Se excedio la temporalidad del contrato")
+  }
+  
+  edad <- as.numeric(datos_asegurados$`Edad iniciando la póliza`[usuario]) + t
+  sexo <- datos_asegurados$`Sexo del asegurado`[usuario]
+  
+  valor_anualidad <-1
+  prob_sobrevivencia <- 1
+  
+  if (sexo == F){
+    for (i in 1:(temporalidad-1)){
+      edad_actual <- edad + i - 1
+      p_actualizado <- 1 - tabla_mort$M_NF[edad_actual + 1]
+      valor_anualidad <-valor_anualidad+(1/(1+tasa))^(i)*prob_sobrevivencia*p_actualizado
+      prob_sobrevivencia <- prob_sobrevivencia*p_actualizado     
+    }
+  }
+  else {
+      for (i in 1:(temporalidad-1)){
+        edad_actual <- edad + i - 1
+        p_actualizado <- 1 - tabla_mort$H_NF[edad_actual + 1]
+        valor_anualidad <- valor_anualidad+(1/(1+tasa))^(i)*prob_sobrevivencia*p_actualizado
+        prob_sobrevivencia <- prob_sobrevivencia*p_actualizado     
+    }
+  }
+  
+  return(valor_anualidad)
+}
+```
+
+```{r funcion_reserva}
+reserva <- function(tabla_mort, datos_asegurados, usuario, t){ 
+  
+  temp_restante =t-1  #se desplaza al 31-12-2023
+  
+  if(format(datos_asegurados$`Fecha de inicio de la póliza`[usuario], "%Y") == "2022") { 
+      temp_restante = temp_restante-1 #ya paso un año más
+  }
+  
+  suma_asegurada <- datos_asegurados$`Suma asegurada`[usuario]
+  prima_comercial <- datos_asegurados$`Monto de la prima comercial`[usuario]
+  prima_inventario <- datos_asegurados$`Monto de la prima de inventario`[usuario]
+  
+  valor_reserva <- suma_asegurada*seguro_temporal(tabla_mort, datos_asegurados, usuario, temp_restante) + anualidad_temporal(tabla_mort, datos_asegurados, usuario, temp_restante)*(prima_comercial*gastos_ad - prima_inventario)
+  
+  return(valor_reserva)
+}
+
+```
+
+
 
