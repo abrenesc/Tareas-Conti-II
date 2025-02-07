@@ -284,22 +284,69 @@ anualidad_temporal <- function(tabla_mort, datos_asegurados, usuario, t){
 ```{r funcion_reserva}
 reserva <- function(tabla_mort, datos_asegurados, usuario, t){ 
   
-  temp_restante =t-1  #se desplaza al 31-12-2023
-  
-  if(format(datos_asegurados$`Fecha de inicio de la póliza`[usuario], "%Y") == "2022") { 
-      temp_restante = temp_restante-1 #ya paso un año más
+  if (t >0){
+    t <-t-1  #la evaluación es al 31-12-2023
   }
+  
+  if (t >0) {
+    if(format(datos_asegurados$`Fecha de inicio de la póliza`[usuario], "%Y") == "2022") { 
+        t <- t-1 #ya paso un año más
+    }    
+  }
+  
   
   suma_asegurada <- datos_asegurados$`Suma asegurada`[usuario]
   prima_comercial <- datos_asegurados$`Monto de la prima comercial`[usuario]
   prima_inventario <- datos_asegurados$`Monto de la prima de inventario`[usuario]
   
-  valor_reserva <- suma_asegurada*seguro_temporal(tabla_mort, datos_asegurados, usuario, temp_restante) + anualidad_temporal(tabla_mort, datos_asegurados, usuario, temp_restante)*(prima_comercial*gastos_ad - prima_inventario)
+  # ⚠️ Depuración: imprimir los valores antes de la multiplicación
+  print(paste("Usuario:", usuario))
+  print(paste("Suma asegurada:", suma_asegurada, "Clase:", class(suma_asegurada)))
+  print(paste("Prima comercial:", prima_comercial, "Clase:", class(prima_comercial)))
+  print(paste("Prima inventario:", prima_inventario, "Clase:", class(prima_inventario)))
+
+  seg_temp <- seguro_temporal(tabla_mort, datos_asegurados, usuario, t)
+  anu_temp <- anualidad_temporal(tabla_mort, datos_asegurados, usuario, t)
+
+  print(paste("Seguro temporal:", seg_temp, "Clase:", class(seg_temp)))
+  print(paste("Anualidad temporal:", anu_temp, "Clase:", class(anu_temp)))
+
+  # Validación para evitar errores en la multiplicación
+  suma_asegurada <- as.numeric(suma_asegurada)
+  prima_comercial <- as.numeric(prima_comercial)
+  prima_inventario <- as.numeric(prima_inventario)
+  seg_temp <- as.numeric(seg_temp)
+  anu_temp <- as.numeric(anu_temp)
+
+  # Verificar si hay NA antes de la multiplicación
+  if (any(is.na(c(suma_asegurada, prima_comercial, prima_inventario, seg_temp, anu_temp)))) {
+    print("Valores NA en la multiplicación")
+    return(NA)
+  }  
   
+  valor_reserva <- suma_asegurada * seg_temp + anu_temp * (prima_comercial * gastos_ad - prima_inventario)
+  
+  print("Valor de la reserva:")
   return(valor_reserva)
 }
 
 ```
 
 
+Así, se hace la fecha de evalación de la reserva el 31 de diciembre de 2023, tomando $t = 0$: 
+
+```{r, results='hide', message=FALSE, include=FALSE}
+
+
+reservas_t0 <- 0
+
+for(i in 1:414){
+  reservas_t0 <- reservas_t0 + reserva(tabla_mort, datos_asegurados, i, 0)
+}
+
+```
+
+```{r}
+reservas_t0
+```
 
