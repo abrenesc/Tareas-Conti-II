@@ -2,7 +2,9 @@
 title: "Tarea 1 CV2"
 author: "Alejandro Brenes y Erick Venegas"
 date: "`r Sys.Date()`"
-output: html_document
+output:
+  html_document: default
+  pdf_document: default
 ---
 # Análisis Exploratorio de los Datos
 ## Descarga de datos
@@ -39,7 +41,7 @@ ggplot(tabla_mort, aes(x = Edad)) +
 
 Se puede recalcar es que la mortalidad se comporta bastante similar hasta llegar a los 70 años aproximadamente, ya que de ahí a aproximadamente los 110 años la mortalidad en los hombres siempre es superior. Algo a destacar es que se asume que en la edad máxima de esta base de datos, 120, la probabilidad de morir al año siguiente no es 1, por lo que no hay una edad $\Omega$ limite donde se "corta". 
 
-Además, pareciera que las probabilidades están bajo un enfoque más optimista, al ser estas bastante bajas. Por ejemplo, hasta la edad de 117, tanto en hombres como en mujeres, la probabilidad de que la persona sobreviva al año siguiente es inclusive mayor a la de morir. Esto es importante tomarlo en cuenta ya que puede repercutir en los montos de las reservas y cómo se comportan las personas a lo largo del tiempo. 
+Además, pareciera que las probabilidades están bajo un enfoque más optimista, al ser estas bastante bajas. Por ejemplo, hasta la edad de 117, tanto en hombres como en mujeres, la probabilidad de que la persona sobreviva al año siguiente es inclusive mayor a la de morir. Esto es importante tomarlo en cuenta ya que puede repercutir en los montos de las reservas y cómo se comportan las personas a lo largo del tiempo. Otro ejemplo de ello es que las anualidades al solo considerar la probabilidad de vida tendrán valores más altos. De igual forma, tener probabilidades de muerte tan bajas, esto repercute a la hora de calcular los seguros, pues se podría estar haciendo una subestimación de estas probabilidades, provocando que las muertes esperadas sean mucho menores que de las que de verdad ocurren. 
 
 ## Análisis para los datos de los contratos
 
@@ -64,6 +66,12 @@ cat("Monedas utilizadas:\n", unique(datos_asegurados$Moneda), "\n")
 
 cat("Opciones para la periodicidad del pago:\n", unique(datos_asegurados$`Periodicidad del pago`), "\n")
 ```
+```{r}
+summary(datos_asegurados)
+```
+
+
+
 
 ### Variables cuantitativas: fechas
 Se continúa con una serie de observaciones de los datos cuantitativos. Para empezar, las fechas. 
@@ -132,7 +140,7 @@ fecha_referencia <- as.Date("2023-12-31")
 diferencia <- as.numeric(difftime(fecha_referencia, datos_asegurados$`Ultima renovación`, units = "days"))
 
 # Se verifica si hay alguna diferencia menor a 365 días
-which(diferencia > 365 & diferencias >= 0)
+which(diferencia > 365 & diferencia >= 0)
 ```
 
 Todos los años de la fecha de inicio de la póliza son 2022 o 2023:
@@ -204,6 +212,7 @@ datos_asegurados$`Edad iniciando la póliza` <- as.integer(interval(datos_asegur
 Datos
 
 ```{r datos}
+# Establecemos los datos dados
 tasa = 0.05
 gastos_ad = 0.16
 ```
@@ -349,4 +358,82 @@ for(i in 1:414){
 ```{r}
 reservas_t0
 ```
+## Interpretación de la Reserva Matemática 
+A modo general y matemáticamente hablando, la ecuación dada establece que la reserva en el momento $t$ es igual a la suma asegurada multiplicada por el seguro temporal que contabiliza el $t$ en sus cálculos, sumándose los gastos de administración, los cuales se pagan durante la vigencia de la póliza y equivale a un cierto porcentaje de la prima comercial. Lo anterior corresponde a los beneficios en valor presente más los gastos en valor presente que la persona asegurada debe cubrir, es decir significa el pasivo para la aseguradora. Por otro lado, hay que restar el valor presente de las primas, las cuales están sujetas a la sobrevivencia del sujero y se pagan durante la vigencia de la póliza, también contempla el $t$ en sus cálculos y esta se considera como la prima de inventario. Esta parte de la ecuación representa los activos para la aseguradora. Por lo tanto, las reservas se definen como los pasivos de la aseguradora menos los activos de la misma.
+
+Según el Reglamento sobre la solvencia de entidades de seguros y reaseguros 02-13, las reservas o provisiones matemáticas (PM) se calcula como "la diferencia entre el valor actuarial de las obligaciones futuras de la entidad y el valor actual actuarial de las obligaciones futuras del asegurador (primas)". Según esta misma normativa, el cálculo de esta se debe hacer de manera prospectiva. Es importante mencionar, que aunque matemáticamente y actuarialmente una reserva negativa se podría interpretar como que la entidad está obteniendo ganancias, según este mismo reglamento "la provisión matemática en ningún momento puede ser negativa". 
+
+![Fórmula Reserva](Formula_Reserva.png)
+
+En donde ya establecimos que el lado izquierdo es la reserva en el momento $t$, S.A corresponde a la suma asegurada $A$ es el seguro temporal, según el EDA realizado anteriormente, podemos ver que todos los seguros tienen duraciones de entre 10 a 30 años. Luego, $a$ simboliza la anualidad, $P$ son las primas que ya mencionamos y $G.A$ corresponde a los gastos de administración. 
+
+
+Recordemos que según el reglamento definimos la prima como "Aportación económica que ha de satisfacer el tomador o asegurado a la anteidad aseguradora en concepto de contraprestación por la cobertura del riesgo que ese le ofrece". A su vez, utilizamos la Prima de Inventario, la cual es según este mismo reglamento "el resultado de sumar a la prima pura el recargo para gastos de administración". Y por último la para la prima comercial esta se define como "Resultado de sumar a la prima de inventario los recargos para gastos de adquisición y la utilidad".
+
+## Interpolación de la Reserva
+La interpolación sucede, según el Reglamento sobre la Solvencia de Entidades de Seguros y Reaseguros, cuando queremos calcular la reserva en un momento intermedio entre las reservas $t$ y $t+1$, para ello usamos la expresión siguiente:
+
+![Fórmula Reserva Interpolación](reserva_interpolacion.jpeg)
+Modificamos la fórmula de la reserva para obtener el valor directamente, pasando por alto los print anteriores.
+
+```{r}
+reserva_nueva <- function(tabla_mort, datos_asegurados, usuario, t){ 
+  
+  if (t >0){
+    t <-t-1  
+  }
+  
+  if (t >0) {
+    if(format(datos_asegurados$`Fecha de inicio de la póliza`[usuario], "%Y") == "2022") { 
+        t <- t-1 
+    }    
+  }
+  
+  suma_asegurada <- datos_asegurados$`Suma asegurada`[usuario]
+  prima_comercial <- datos_asegurados$`Monto de la prima comercial`[usuario]
+  prima_inventario <- datos_asegurados$`Monto de la prima de inventario`[usuario]
+
+  seg_temp <- seguro_temporal(tabla_mort, datos_asegurados, usuario, t)
+  anu_temp <- anualidad_temporal(tabla_mort, datos_asegurados, usuario, t)
+
+  suma_asegurada <- as.numeric(suma_asegurada)
+  prima_comercial <- as.numeric(prima_comercial)
+  prima_inventario <- as.numeric(prima_inventario)
+  seg_temp <- as.numeric(seg_temp)
+  anu_temp <- as.numeric(anu_temp)
+
+  if (any(is.na(c(suma_asegurada, prima_comercial, prima_inventario, seg_temp, anu_temp)))) {
+    return(NA)
+  }  
+  
+  valor_reserva <- suma_asegurada * seg_temp + anu_temp * (prima_comercial * gastos_ad - prima_inventario)
+
+  return(valor_reserva)
+}
+
+```
+
+Una vez implementada la función anterior, la fórmula de interpolación es solo de implementar como sigue: 
+
+```{r}
+reserva_interpolada <- function(tabla_mort, datos_asegurados, usuario, t, h){ 
+  # Obtenemos la reserva matemática en t y t+1
+  reserva_t <- reserva_nueva(tabla_mort, datos_asegurados, usuario, t)
+  reserva_t1 <- reserva_nueva(tabla_mort, datos_asegurados, usuario, t + 1)
+  
+  prima_inventario <- as.numeric(datos_asegurados$`Monto de la prima de inventario`[usuario])
+  
+  T <- 365
+  # Calculamos el valor de la reserva interpolada
+  reserva_interp <- ( (reserva_t + prima_inventario) * ((T - h) / T) ) + (reserva_t1 * (h / T))
+  
+  return(reserva_interp)
+}
+```
+
+
+
+
+
+
 
