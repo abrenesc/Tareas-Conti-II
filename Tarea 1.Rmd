@@ -299,7 +299,7 @@ reserva <- function(tabla_mort, datos_asegurados, usuario, t){
   prima_comercial <- datos_asegurados$`Monto de la prima comercial`[usuario]
   prima_inventario <- datos_asegurados$`Monto de la prima de inventario`[usuario]
   
-  # ⚠️ Depuración: imprimir los valores antes de la multiplicación
+  # imprimir los valores antes de la multiplicación
   print(paste("Usuario:", usuario))
   print(paste("Suma asegurada:", suma_asegurada, "Clase:", class(suma_asegurada)))
   print(paste("Prima comercial:", prima_comercial, "Clase:", class(prima_comercial)))
